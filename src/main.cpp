@@ -86,7 +86,7 @@ int16_t gx, gy, gz;
 // uncomment "OUTPUT_READABLE_ACCELGYRO" if you want to see a tab-separated
 // list of the accel X/Y/Z and then gyro X/Y/Z values in decimal. Easy to read,
 // not so easy to parse, and slow(er) over UART.
-#define OUTPUT_READABLE_ACCELGYRO
+//#define OUTPUT_READABLE_ACCELGYRO
 
 // uncomment "OUTPUT_BINARY_ACCELGYRO" to send all 6 axes of data as 16-bit
 // binary, one right after the other. This is very fast (as fast as possible
@@ -94,7 +94,13 @@ int16_t gx, gy, gz;
 // for a human.
 //#define OUTPUT_BINARY_ACCELGYRO
 
-#define DEBUG
+
+
+
+
+
+#define UTF8_SD
+//#define DEBUG
 
 DummySerial dummySerial;
 
@@ -114,6 +120,7 @@ bool blinkState = false;
 
 //int16_t ax, ay, az;
 
+uint8_t counter = 0;
 void setup() {
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -125,11 +132,12 @@ void setup() {
     // initialize serial communication
     // (38400 chosen because it works as well at 8MHz as it does at 16MHz, but
     // it's really up to you depending on your project)
-    mySerial.begin(38400);
+    mySerial.begin(115200);
 
     // initialize device
     mySerial.println("Initializing I2C devices...");
     accelgyro.initialize();
+    //accelgyro.setRate(2);
 
     // verify connection
     mySerial.println("Testing device connections...");
@@ -163,20 +171,29 @@ void setup() {
     mySerial.print("\n");
 
 
-  //  mySerial.print("Initializing SD card...");
-//
-  //  if (!SD.begin(chipSelect)) {
-  //    mySerial.println("initialization failed. Things to check:");
-  //    mySerial.println("1. is a card inserted?");
-  //    mySerial.println("2. is your wiring correct?");
-  //    mySerial.println("3. did you change the chipSelect pin to match your shield or module?");
-  //    mySerial.println("Note: press reset button on the board and reopen this mySerial Monitor after fixing your issue!");
-  //  while (true);
-  //}
+    mySerial.println("Initializing SD card...");
+
+    if (!SD.begin(SPI_FULL_SPEED,chipSelect)) {
+      mySerial.println("initialization failed. Things to check:");
+      mySerial.println("1. is a card inserted?");
+      mySerial.println("2. is your wiring correct?");
+      mySerial.println("3. did you change the chipSelect pin to match your shield or module?");
+      mySerial.println("Note: press reset button on the board and reopen this Serial Monitor after fixing your issue!");
+      while (true);
+    }
+    //delay(5000);
     
+    Serial.println("initialization done.");
+
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  
+
+  
 
     // configure Arduino LED pin for output
     pinMode(LED_PIN, OUTPUT);
+    myFile = SD.open("test.txt",  O_CREAT | O_WRITE);
 }
 
 void loop() {
@@ -202,16 +219,35 @@ void loop() {
     #endif
 
     #ifdef OUTPUT_BINARY_ACCELGYRO
-        mySerial.write((uint8_t)(ax >> 8)); mySerial.write((uint8_t)(ax & 0xFF));
-        mySerial.write((uint8_t)(ay >> 8)); mySerial.write((uint8_t)(ay & 0xFF));
-        mySerial.write((uint8_t)(az >> 8)); mySerial.write((uint8_t)(az & 0xFF));
-        mySerial.write((uint8_t)(gx >> 8)); mySerial.write((uint8_t)(gx & 0xFF));
-        mySerial.write((uint8_t)(gy >> 8)); mySerial.write((uint8_t)(gy & 0xFF));
-        mySerial.write((uint8_t)(gz >> 8)); mySerial.write((uint8_t)(gz & 0xFF));// MPU6050 offset-finder, based on Jeff Rowberg's MPU6050_RAW
+      myFile = SD.open("test.txt", FILE_WRITE);
+      myFile.write((uint8_t)(ax >> 8)); myFile.write((uint8_t)(ax & 0xFF));
+      myFile.write((uint8_t)(ay >> 8)); myFile.write((uint8_t)(ay & 0xFF));
+      myFile.write((uint8_t)(az >> 8)); myFile.write((uint8_t)(az & 0xFF));
+      myFile.write((uint8_t)(gx >> 8)); myFile.write((uint8_t)(gx & 0xFF));
+      myFile.write((uint8_t)(gy >> 8)); myFile.write((uint8_t)(gy & 0xFF));
+      myFile.write((uint8_t)(gz >> 8)); myFile.write((uint8_t)(gz & 0xFF));// MPU6050 offset-finder, based on Jeff Rowberg's MPU6050_RAW
+      myFile.close();
+    #endif
+
+
+    
+    #ifdef UTF8_SD
+      
+      char buffer[80];
+      sprintf(buffer, "t/a/g:\t%lu\t%d\t%d\t%d\t%d\t%d\t%d\n", micros(), ax, ay, az, gx, gy, gz);
+      myFile.print(buffer);
+      
+      counter +=1;
+      if (counter == 100){
+        myFile.flush();
+        counter = 0;
+      }
+
     #endif
 
     // blink LED to indicate activity
     blinkState = !blinkState;
     digitalWrite(LED_PIN, blinkState);
-    delay(100);
+    //delay(100);
+    
 }
