@@ -163,16 +163,16 @@ void setup() {
     mySerial.print("\n");
 
 
-      mySerial.print("Initializing SD card...");
-
-    if (!SD.begin(chipSelect)) {
-      mySerial.println("initialization failed. Things to check:");
-      mySerial.println("1. is a card inserted?");
-      mySerial.println("2. is your wiring correct?");
-      mySerial.println("3. did you change the chipSelect pin to match your shield or module?");
-      mySerial.println("Note: press reset button on the board and reopen this mySerial Monitor after fixing your issue!");
-    while (true);
-  }
+  //  mySerial.print("Initializing SD card...");
+//
+  //  if (!SD.begin(chipSelect)) {
+  //    mySerial.println("initialization failed. Things to check:");
+  //    mySerial.println("1. is a card inserted?");
+  //    mySerial.println("2. is your wiring correct?");
+  //    mySerial.println("3. did you change the chipSelect pin to match your shield or module?");
+  //    mySerial.println("Note: press reset button on the board and reopen this mySerial Monitor after fixing your issue!");
+  //  while (true);
+  //}
     
 
     // configure Arduino LED pin for output
