@@ -179,6 +179,11 @@ void setup() {
     accelgyro.setXGyroFIFOEnabled(0);
     accelgyro.setYGyroFIFOEnabled(0);
     accelgyro.setZGyroFIFOEnabled(0);
+    accelgyro.setTempFIFOEnabled(0);
+    accelgyro.setSlave0FIFOEnabled(0);
+    accelgyro.setSlave1FIFOEnabled(0);
+    accelgyro.setSlave2FIFOEnabled(0);
+    accelgyro.setSlave3FIFOEnabled(0);
     
     //accelgyro.resetFIFO();  // Clear any garbage data
 
@@ -271,14 +276,10 @@ void loop() {
       mySerial.println(fifoCount);
       
       // Calculate how many complete samples we can read
-      uint16_t bytesToRead = (fifoCount / 6) * 6;  // Round down to multiple of 6
-      if (bytesToRead > 198) {
-        bytesToRead = 198;  // Limit to buffer size
-      }
-      
+
       char data[198];
-      accelgyro.getFIFOBytes((uint8_t*)data, bytesToRead);
-      file.write(data, bytesToRead);
+      accelgyro.getFIFOBytes((uint8_t*)data, 198);
+      file.write(data, 198);
       
       // Only sync every 10 writes to reduce SD overhead
       syncCounter++;
