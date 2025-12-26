@@ -1,9 +1,17 @@
+#define SPI_CLOCK SD_SCK_MHZ(50)
+#define SD_CS_PIN SS
+#define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
+#define LOG_INTERVAL_USEC 600
+#define MAX_FILE_SIZE 10000000UL
+
+
 // I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
 // for both classes must be in the include path of your project
 #include "Arduino.h"
 #include "I2Cdev.h"
 #include "MPU6050.h"
-#include <SD.h>
+//#include <SD.h>
+#include "SdFat.h"
 
 
 class DummySerial : public Stream
@@ -80,9 +88,6 @@ MPU6050 accelgyro;
 int16_t ax, ay, az;
 int16_t gx, gy, gz;
 
-
-
-
 // uncomment "OUTPUT_READABLE_ACCELGYRO" if you want to see a tab-separated
 // list of the accel X/Y/Z and then gyro X/Y/Z values in decimal. Easy to read,
 // not so easy to parse, and slow(er) over UART.
@@ -93,11 +98,6 @@ int16_t gx, gy, gz;
 // without compression or data loss), and easy to parse, but impossible to read
 // for a human.
 //#define OUTPUT_BINARY_ACCELGYRO
-
-
-
-
-
 
 //#define UTF8_SD
 #define DEBUG
@@ -110,18 +110,40 @@ DummySerial dummySerial;
 #define mySerial dummySerial
 #endif
 
-
 const int chipSelect = 10;
-File myFile;
-
-
+SdFs sd;
+FsFile file;
 #define LED_PIN 13
 bool blinkState = false;
 
-//int16_t ax, ay, az;
-
 uint8_t counter = 0;
 uint8_t buffer[42*3*2];
+uint16_t fileNum = 0;
+uint16_t syncCounter = 0;
+#define SYNC_INTERVAL 100
+
+void openNewFile() {
+  if (file.isOpen()) {
+    file.close();
+  }
+
+  char filename[16];
+  sprintf(filename, "LOG%04d.bin", fileNum++);
+  
+  file = sd.open(filename, O_RDWR | O_CREAT | O_TRUNC);
+  if (!file) {
+    mySerial.print("Failed to open file: ");
+    mySerial.println(filename);
+    while (1);  // Halt on error
+  }
+
+  if (!file.preAllocate(MAX_FILE_SIZE)) {
+    mySerial.println("preAllocate failed");
+    file.close();
+    while (1);
+  }
+}
+
 void setup() {
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -129,18 +151,12 @@ void setup() {
     #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
         Fastwire::setup(400, true);
     #endif
-
-    // initialize serial communication
-    // (38400 chosen because it works as well at 8MHz as it does at 16MHz, but
-    // it's really up to you depending on your project)
     mySerial.begin(115200);
-
     // initialize device
     mySerial.println("Initializing I2C devices...");
     accelgyro.initialize();
     accelgyro.setRate(7);
     //accelgyro.setRate(2);
-
     accelgyro.setFIFOEnabled(1);
     accelgyro.setAccelFIFOEnabled(1);
     accelgyro.setXGyroFIFOEnabled(0);
@@ -180,36 +196,53 @@ void setup() {
     mySerial.print("\n");
 
 
-
-
     mySerial.println("Initializing SD card...");
-
-    if (!SD.begin(SPI_FULL_SPEED,chipSelect)) {
+    
+    // Close any open files and end previous SD session
+    if (file.isOpen()) {
+      file.close();
+    }
+    sd.end();
+    
+    // Reset CS pin to ensure clean state
+    pinMode(SD_CS_PIN, OUTPUT);
+    digitalWrite(SD_CS_PIN, HIGH);
+    delay(10);
+    
+    // Try multiple times to initialize
+    bool sdInitialized = false;
+    for (int attempt = 0; attempt < 200; attempt++) {
+      if (sd.begin(SD_CONFIG)) {
+        sdInitialized = true;
+        break;
+      }
+      mySerial.print("SD init attempt ");
+      mySerial.print(attempt + 1);
+      mySerial.println(" failed, retrying...");
+      sd.end();
+      delay(100);
+    }
+    
+    if (!sdInitialized) {
       mySerial.println("initialization failed. Things to check:");
-      mySerial.println("1. is a card inserted?");
-      mySerial.println("2. is your wiring correct?");
-      mySerial.println("3. did you change the chipSelect pin to match your shield or module?");
-      mySerial.println("Note: press reset button on the board and reopen this Serial Monitor after fixing your issue!");
+     // mySerial.println("1. is a card inserted?");
+     // mySerial.println("2. is your wiring correct?");
+     // mySerial.println("3. did you change the chipSelect pin to match your shield or module?");
+     // mySerial.println("Note: press reset button on the board and reopen this Serial Monitor after fixing your issue!");
       while (true);
     }
-    //delay(5000);
+  
+    openNewFile();
     
     Serial.println("initialization done.");
-
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
-    // configure Arduino LED pin for output
     pinMode(LED_PIN, OUTPUT);
-    myFile = SD.open("test.txt",  O_CREAT | O_WRITE | O_APPEND);
-    
     accelgyro.resetFIFO();
 }
 
 void loop() {
     // read raw accel/gyro measurements from device
     char data[120];
-    
-    
+
 
     mySerial.println(accelgyro.getFIFOCount());
     // Only read when we have at least one complete 6-byte packet (accel only)
@@ -221,32 +254,22 @@ void loop() {
         int16_t ax = (int16_t)((data[0] << 8) | data[1]);
         int16_t ay = (int16_t)((data[2] << 8) | data[3]);
         int16_t az = (int16_t)((data[4] << 8) | data[5]);
-        myFile = SD.open("test.txt",  O_CREAT | O_WRITE | O_APPEND);
-        myFile.print(data);
-        myFile.close();
+        file.write(data);
+        
+        // Sync periodically to prevent corruption
+        
+        
+        file.sync();
+        
+        
+        //myFile = SD.open("test.txt",  O_CREAT | O_WRITE | O_APPEND);
+        //myFile.print(data);
+        //myFile.close();
         //mySerial.print(ax); mySerial.print(" ");
         //mySerial.print(ay); mySerial.print(" ");
         //mySerial.print(az);
         //mySerial.println();
     }
-
-    // these methods (and a few others) are also available
-    //accelgyro.getAcceleration(&ax, &ay, &az);
-    //accelgyro.getRotation(&gx, &gy, &gz);
-
-    #ifdef OUTPUT_READABLE_ACCELGYRO
-        // display tab-separated accel/gyro x/y/z values
-        mySerial.print("t/a/g:\t");
-        mySerial.print(micros());
-        mySerial.print("\t");
-        mySerial.print(ax); mySerial.print("\t");
-        mySerial.print(ay); mySerial.print("\t");
-        mySerial.print(az); mySerial.print("\t");
-        mySerial.print(gx); mySerial.print("\t");
-        mySerial.print(gy); mySerial.print("\t");
-        mySerial.println(gz);
-
-    #endif
 
     #ifdef OUTPUT_BINARY_ACCELGYRO
       myFile = SD.open("test.txt", FILE_WRITE);
@@ -258,8 +281,6 @@ void loop() {
       myFile.write((uint8_t)(gz >> 8)); myFile.write((uint8_t)(gz & 0xFF));// MPU6050 offset-finder, based on Jeff Rowberg's MPU6050_RAW
       myFile.close();
     #endif
-
-
     
     #ifdef UTF8_SD
       
