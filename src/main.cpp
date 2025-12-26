@@ -3,7 +3,7 @@
 #include "Arduino.h"
 #include "I2Cdev.h"
 #include "MPU6050.h"
-#include <SD.h>
+#include <SdFat.h>
 
 
 class DummySerial : public Stream
@@ -99,8 +99,8 @@ int16_t gx, gy, gz;
 
 
 
-#define UTF8_SD
-//#define DEBUG
+//#define UTF8_SD
+#define DEBUG
 
 DummySerial dummySerial;
 
@@ -112,7 +112,8 @@ DummySerial dummySerial;
 
 
 const int chipSelect = 10;
-File myFile;
+SdFat sd;
+FsFile myFile;
 
 
 #define LED_PIN 13
@@ -121,6 +122,7 @@ bool blinkState = false;
 //int16_t ax, ay, az;
 
 uint8_t counter = 0;
+uint8_t buffer[42*3*2];
 void setup() {
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -137,7 +139,15 @@ void setup() {
     // initialize device
     mySerial.println("Initializing I2C devices...");
     accelgyro.initialize();
+    accelgyro.setRate(7);
     //accelgyro.setRate(2);
+
+    accelgyro.setFIFOEnabled(1);
+    accelgyro.setAccelFIFOEnabled(1);
+    accelgyro.setXGyroFIFOEnabled(0);
+    accelgyro.setYGyroFIFOEnabled(0);
+    accelgyro.setZGyroFIFOEnabled(0);
+    //accelgyro.resetFIFO();  // Clear any garbage data
 
     // verify connection
     mySerial.println("Testing device connections...");
@@ -158,9 +168,9 @@ void setup() {
     accelgyro.setYGyroOffset(112);
     accelgyro.setZGyroOffset(-22);
 
-    accelgyro.setXAccelOffset(959);
-    accelgyro.setXAccelOffset(-1629);
-    accelgyro.setXAccelOffset(1577);
+    accelgyro.setXAccelOffset(-836);
+    accelgyro.setYAccelOffset(-1713);
+    accelgyro.setZAccelOffset(3524);
 
     mySerial.print(accelgyro.getXAccelOffset()); mySerial.print("\t"); // -76
     mySerial.print(accelgyro.getYAccelOffset()); mySerial.print("\t"); // -2359
@@ -171,9 +181,11 @@ void setup() {
     mySerial.print("\n");
 
 
+
+
     mySerial.println("Initializing SD card...");
 
-    if (!SD.begin(SPI_FULL_SPEED,chipSelect)) {
+    if (!sd.begin(chipSelect, SD_SCK_MHZ(50))) {
       mySerial.println("initialization failed. Things to check:");
       mySerial.println("1. is a card inserted?");
       mySerial.println("2. is your wiring correct?");
@@ -181,24 +193,56 @@ void setup() {
       mySerial.println("Note: press reset button on the board and reopen this Serial Monitor after fixing your issue!");
       while (true);
     }
-    //delay(5000);
     
     Serial.println("initialization done.");
 
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
-  
-
-  
-
     // configure Arduino LED pin for output
     pinMode(LED_PIN, OUTPUT);
-    myFile = SD.open("test.txt",  O_CREAT | O_WRITE);
+    
+    // Remove old file if exists
+    if (sd.exists("data.bin")) {
+      sd.remove("data.bin");
+    }
+    
+    // Create and pre-allocate file to max FAT16 size (2GB - 1 byte)
+    if (!myFile.open("data.bin", O_RDWR | O_CREAT)) {
+      mySerial.println("Failed to create file!");
+      while (true);
+    }
+    
+    mySerial.println("Pre-allocating file to 2GB...");
+    if (!myFile.preAllocate(2147483647UL)) {  // Max FAT16 file size
+      mySerial.println("Pre-allocation failed!");
+      while (true);
+    }
+    mySerial.println("File pre-allocated successfully!");
+    
+    accelgyro.resetFIFO();
 }
 
 void loop() {
     // read raw accel/gyro measurements from device
-    accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    uint8_t data[200];
+    
+    
+
+    mySerial.println(accelgyro.getFIFOCount());
+    // Only read when we have at least one complete 6-byte packet (accel only)
+    if (accelgyro.getFIFOCount() >= 200){
+        // Read 6-byte packet (accel XYZ only, gyro FIFO is disabled)
+        accelgyro.getFIFOBytes(data, 200);
+        mySerial.println(accelgyro.getFIFOCount());
+        // Parse and print accel X, Y, Z (signed 16-bit)
+        int16_t ax = (int16_t)((data[0] << 8) | data[1]);
+        int16_t ay = (int16_t)((data[2] << 8) | data[3]);
+        int16_t az = (int16_t)((data[4] << 8) | data[5]);
+        
+        myFile.write(data, 200);  // Write binary data
+        //mySerial.print(ax); mySerial.print(" ");
+        //mySerial.print(ay); mySerial.print(" ");
+        //mySerial.print(az);
+        //mySerial.println();
+    }
 
     // these methods (and a few others) are also available
     //accelgyro.getAcceleration(&ax, &ay, &az);
