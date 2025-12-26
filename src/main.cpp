@@ -3,7 +3,7 @@
 #include "Arduino.h"
 #include "I2Cdev.h"
 #include "MPU6050.h"
-#include <SdFat.h>
+#include <SD.h>
 
 
 class DummySerial : public Stream
@@ -112,8 +112,7 @@ DummySerial dummySerial;
 
 
 const int chipSelect = 10;
-SdFat sd;
-FsFile myFile;
+File myFile;
 
 
 #define LED_PIN 13
@@ -185,7 +184,7 @@ void setup() {
 
     mySerial.println("Initializing SD card...");
 
-    if (!sd.begin(chipSelect, SD_SCK_MHZ(50))) {
+    if (!SD.begin(SPI_FULL_SPEED,chipSelect)) {
       mySerial.println("initialization failed. Things to check:");
       mySerial.println("1. is a card inserted?");
       mySerial.println("2. is your wiring correct?");
@@ -193,51 +192,38 @@ void setup() {
       mySerial.println("Note: press reset button on the board and reopen this Serial Monitor after fixing your issue!");
       while (true);
     }
+    //delay(5000);
     
     Serial.println("initialization done.");
 
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
     // configure Arduino LED pin for output
     pinMode(LED_PIN, OUTPUT);
-    
-    // Remove old file if exists
-    if (sd.exists("data.bin")) {
-      sd.remove("data.bin");
-    }
-    
-    // Create and pre-allocate file to max FAT16 size (2GB - 1 byte)
-    if (!myFile.open("data.bin", O_RDWR | O_CREAT)) {
-      mySerial.println("Failed to create file!");
-      while (true);
-    }
-    
-    mySerial.println("Pre-allocating file to 2GB...");
-    if (!myFile.preAllocate(2147483647UL)) {  // Max FAT16 file size
-      mySerial.println("Pre-allocation failed!");
-      while (true);
-    }
-    mySerial.println("File pre-allocated successfully!");
+    myFile = SD.open("test.txt",  O_CREAT | O_WRITE | O_APPEND);
     
     accelgyro.resetFIFO();
 }
 
 void loop() {
     // read raw accel/gyro measurements from device
-    uint8_t data[200];
+    char data[120];
     
     
 
     mySerial.println(accelgyro.getFIFOCount());
     // Only read when we have at least one complete 6-byte packet (accel only)
-    if (accelgyro.getFIFOCount() >= 200){
+    if (accelgyro.getFIFOCount() >= 120){
         // Read 6-byte packet (accel XYZ only, gyro FIFO is disabled)
-        accelgyro.getFIFOBytes(data, 200);
+        accelgyro.getFIFOBytes((uint8_t*)data, 120);
         mySerial.println(accelgyro.getFIFOCount());
         // Parse and print accel X, Y, Z (signed 16-bit)
         int16_t ax = (int16_t)((data[0] << 8) | data[1]);
         int16_t ay = (int16_t)((data[2] << 8) | data[3]);
         int16_t az = (int16_t)((data[4] << 8) | data[5]);
-        
-        myFile.write(data, 200);  // Write binary data
+        myFile = SD.open("test.txt",  O_CREAT | O_WRITE | O_APPEND);
+        myFile.print(data);
+        myFile.close();
         //mySerial.print(ax); mySerial.print(" ");
         //mySerial.print(ay); mySerial.print(" ");
         //mySerial.print(az);
