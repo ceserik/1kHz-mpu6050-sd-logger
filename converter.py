@@ -1,6 +1,6 @@
 import struct
 
-input_file = "LOG0000.bin"
+input_file = "24.bin"
 output_file = "output.txt"
 
 with open(input_file, "rb") as f_in, open(output_file, "w") as f_out:

@@ -9,6 +9,7 @@
 // for both classes must be in the include path of your project
 #include "Arduino.h"
 #include "I2Cdev.h"
+
 #include "MPU6050.h"
 //#include <SD.h>
 #include "SdFat.h"
@@ -117,37 +118,44 @@ FsFile file;
 bool blinkState = false;
 
 uint8_t counter = 0;
-uint8_t buffer[42*3*2];
+//uint8_t buffer[42*3*2];
 uint16_t fileNum = 0;
 uint16_t syncCounter = 0;
-#define SYNC_INTERVAL 100
-
+unsigned long start;
 void openNewFile() {
   if (file.isOpen()) {
     file.close();
   }
 
-  char filename[16];
-  sprintf(filename, "LOG%04d.bin", fileNum++);
+  char filename[10];
   
-  file = sd.open(filename, O_RDWR | O_CREAT | O_TRUNC);
+  // Find first non-existent file number
+  while (fileNum < 100) {
+    sprintf(filename, "%02d.bin", fileNum);
+    if (!sd.exists(filename)) {
+      break;  // Found available filename
+    }
+    fileNum++;
+  }
+  
+  file = sd.open(filename, O_RDWR | O_CREAT | O_EXCL);
   if (!file) {
-    mySerial.print("Failed to open file: ");
-    mySerial.println(filename);
     while (1);  // Halt on error
   }
 
   if (!file.preAllocate(MAX_FILE_SIZE)) {
-    mySerial.println("preAllocate failed");
     file.close();
     while (1);
   }
+  
+  fileNum++;  // Ready for next file
 }
 
 void setup() {
     // join I2C bus (I2Cdev library doesn't do this automatically)
     #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
         Wire.begin();
+        Wire.setClock(400000);
     #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
         Fastwire::setup(400, true);
     #endif
@@ -155,22 +163,32 @@ void setup() {
     // initialize device
     mySerial.println("Initializing I2C devices...");
     accelgyro.initialize();
-    accelgyro.setRate(7);
-    //accelgyro.setRate(2);
+    
+    // Set DLPF to 0 for 8kHz gyro rate (or keep at 1+ for 1kHz)
+    // DLPF_CFG=0: 8kHz sample rate, 260Hz accel BW, 256Hz gyro BW
+    // DLPF_CFG=1: 1kHz sample rate, 184Hz accel BW, 188Hz gyro BW
+    accelgyro.setDLPFMode(0);  // 8kHz base rate for gyro
+    
+    // Sample Rate = Base Rate / (1 + SMPLRT_DIV)
+    // With DLPF=0: 8kHz / (1 + rate)
+    // rate=0 -> 8000Hz, rate=1 -> 4000Hz, rate=3 -> 2000Hz, rate=7 -> 1000Hz
+    accelgyro.setRate(3);  // 8kHz (but accel limited to 1kHz max)
+    
     accelgyro.setFIFOEnabled(1);
     accelgyro.setAccelFIFOEnabled(1);
     accelgyro.setXGyroFIFOEnabled(0);
     accelgyro.setYGyroFIFOEnabled(0);
     accelgyro.setZGyroFIFOEnabled(0);
+    
     //accelgyro.resetFIFO();  // Clear any garbage data
 
     // verify connection
-    mySerial.println("Testing device connections...");
-    mySerial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+//    mySerial.println("Testing device connections...");
+ //   mySerial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
     // use the code below to change accel/gyro offset values
     
-    mySerial.println("Updating internal sensor offsets...");
+//    mySerial.println("Updating internal sensor offsets...");
     // -76	-2359	1688	0	0	0
     mySerial.print(accelgyro.getXAccelOffset()); mySerial.print("\t"); // -76
     mySerial.print(accelgyro.getYAccelOffset()); mySerial.print("\t"); // -2359
@@ -216,7 +234,7 @@ void setup() {
         sdInitialized = true;
         break;
       }
-      mySerial.print("SD init attempt ");
+ //     mySerial.print("SD init attempt ");
       mySerial.print(attempt + 1);
       mySerial.println(" failed, retrying...");
       sd.end();
@@ -224,81 +242,53 @@ void setup() {
     }
     
     if (!sdInitialized) {
-      mySerial.println("initialization failed. Things to check:");
-     // mySerial.println("1. is a card inserted?");
-     // mySerial.println("2. is your wiring correct?");
-     // mySerial.println("3. did you change the chipSelect pin to match your shield or module?");
-     // mySerial.println("Note: press reset button on the board and reopen this Serial Monitor after fixing your issue!");
+      mySerial.println("FF");
       while (true);
     }
   
     openNewFile();
     
-    Serial.println("initialization done.");
+ //   Serial.println("initialization done.");
     pinMode(LED_PIN, OUTPUT);
     accelgyro.resetFIFO();
+    mySerial.println("logging");
+    start = millis();
 }
 
 void loop() {
-    // read raw accel/gyro measurements from device
-    char data[120];
-
-
-    mySerial.println(accelgyro.getFIFOCount());
-    // Only read when we have at least one complete 6-byte packet (accel only)
-    if (accelgyro.getFIFOCount() >= 120){
-        // Read 6-byte packet (accel XYZ only, gyro FIFO is disabled)
-        accelgyro.getFIFOBytes((uint8_t*)data, 120);
-        mySerial.println(accelgyro.getFIFOCount());
-        // Parse and print accel X, Y, Z (signed 16-bit)
-        int16_t ax = (int16_t)((data[0] << 8) | data[1]);
-        int16_t ay = (int16_t)((data[2] << 8) | data[3]);
-        int16_t az = (int16_t)((data[4] << 8) | data[5]);
-        file.write(data);
-        
-        // Sync periodically to prevent corruption
-        
-        
-        file.sync();
-        
-        
-        //myFile = SD.open("test.txt",  O_CREAT | O_WRITE | O_APPEND);
-        //myFile.print(data);
-        //myFile.close();
-        //mySerial.print(ax); mySerial.print(" ");
-        //mySerial.print(ay); mySerial.print(" ");
-        //mySerial.print(az);
-        //mySerial.println();
-    }
-
-    #ifdef OUTPUT_BINARY_ACCELGYRO
-      myFile = SD.open("test.txt", FILE_WRITE);
-      myFile.write((uint8_t)(ax >> 8)); myFile.write((uint8_t)(ax & 0xFF));
-      myFile.write((uint8_t)(ay >> 8)); myFile.write((uint8_t)(ay & 0xFF));
-      myFile.write((uint8_t)(az >> 8)); myFile.write((uint8_t)(az & 0xFF));
-      myFile.write((uint8_t)(gx >> 8)); myFile.write((uint8_t)(gx & 0xFF));
-      myFile.write((uint8_t)(gy >> 8)); myFile.write((uint8_t)(gy & 0xFF));
-      myFile.write((uint8_t)(gz >> 8)); myFile.write((uint8_t)(gz & 0xFF));// MPU6050 offset-finder, based on Jeff Rowberg's MPU6050_RAW
-      myFile.close();
-    #endif
+    uint16_t fifoCount = accelgyro.getFIFOCount();
     
-    #ifdef UTF8_SD
+    // Check for FIFO overflow (max is 1024 bytes)
+    if (fifoCount >= 1024) {
+      mySerial.println("FIFO overflow - resetting");
+      accelgyro.resetFIFO();
+      return;
+    }
+    
+    // Only read when we have complete samples (multiples of 6 bytes)
+    // Read in batches of 198 bytes (33 samples) for efficiency
+    if (fifoCount >= 198 && millis() - start < 10000) {
+      mySerial.println(fifoCount);
       
-      char buffer[80];
-      sprintf(buffer, "t/a/g:\t%lu\t%d\t%d\t%d\t%d\t%d\t%d\n", micros(), ax, ay, az, gx, gy, gz);
-      myFile.print(buffer);
-      
-      counter +=1;
-      if (counter == 100){
-        myFile.flush();
-        counter = 0;
+      // Calculate how many complete samples we can read
+      uint16_t bytesToRead = (fifoCount / 6) * 6;  // Round down to multiple of 6
+      if (bytesToRead > 198) {
+        bytesToRead = 198;  // Limit to buffer size
       }
-
-    #endif
-
+      
+      char data[198];
+      accelgyro.getFIFOBytes((uint8_t*)data, bytesToRead);
+      file.write(data, bytesToRead);
+      
+      // Only sync every 10 writes to reduce SD overhead
+      syncCounter++;
+      if (syncCounter >= 10) {
+        file.sync();
+        syncCounter = 0;
+      }
+    }
+    
     // blink LED to indicate activity
     blinkState = !blinkState;
     digitalWrite(LED_PIN, blinkState);
-    //delay(100);
-    
 }
