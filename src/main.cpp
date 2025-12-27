@@ -3,7 +3,7 @@
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
 #define LOG_INTERVAL_USEC 600
 #define MAX_FILE_SIZE 10000000UL
-#define BUFFER_SIZE 120  // 10 samples * 12 bytes (accel+gyro) per chunk
+#define BUFFER_SIZE 112  // 7 samples * 16 bytes (4 timestamp + 12 IMU) per chunk
 
 // I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
 // for both classes must be in the include path of your project
@@ -174,6 +174,11 @@ void setup() {
     // rate=0 -> 8000Hz, rate=1 -> 4000Hz, rate=3 -> 2000Hz, rate=7 -> 1000Hz
     accelgyro.setRate(7);  // 8kHz (but accel limited to 1kHz max)
     
+    // Set ranges AFTER other configuration
+    accelgyro.setFullScaleAccelRange(0);  // ±2g
+    accelgyro.setFullScaleGyroRange(0);   // ±250°/s
+    delay(10);  // Give sensor time to apply settings
+    
     accelgyro.setFIFOEnabled(1);
     accelgyro.setAccelFIFOEnabled(1);
     accelgyro.setXGyroFIFOEnabled(1);
@@ -206,9 +211,9 @@ void setup() {
     accelgyro.setYGyroOffset(112);
     accelgyro.setZGyroOffset(-22);
 
-    accelgyro.setXAccelOffset(-836);
-    accelgyro.setYAccelOffset(-1713);
-    accelgyro.setZAccelOffset(3524);
+    accelgyro.setXAccelOffset(-773);  // Test with no offsets
+    accelgyro.setYAccelOffset(-1656);
+    accelgyro.setZAccelOffset(1580);
 
     mySerial.print(accelgyro.getXAccelOffset()); mySerial.print("\t"); // -76
     mySerial.print(accelgyro.getYAccelOffset()); mySerial.print("\t"); // -2359
@@ -217,8 +222,14 @@ void setup() {
     mySerial.print(accelgyro.getYGyroOffset()); mySerial.print("\t"); // 0
     mySerial.print(accelgyro.getZGyroOffset()); mySerial.print("\t"); // 0
     mySerial.print("\n");
+    
+    // Debug: Check actual range settings
+    mySerial.print("Accel range: ");
+    mySerial.println(accelgyro.getFullScaleAccelRange());  // Should be 0 for ±2g
+    mySerial.print("Gyro range: ");
+    mySerial.println(accelgyro.getFullScaleGyroRange());  // Should be 0 for ±250°/s
 
-
+    //while(1){}
     mySerial.println("Initializing SD card...");
     
     // Close any open files and end previous SD session
@@ -270,17 +281,35 @@ void loop() {
       return;
     }
     
-    // Read in two 120-byte chunks (20 samples total with accel+gyro)
-    if (fifoCount >= 240 && millis() - start < 10000) {
+    // Read IMU data and add timestamps (16 bytes per sample: 4 timestamp + 12 IMU)
+    if (fifoCount >= 168 && millis() - start < 10000) {  // 14 samples * 12 bytes
       mySerial.println(accelgyro.getFIFOCount());
       
-      char data[240];
-      // First chunk: 120 bytes (10 samples)
-      accelgyro.getFIFOBytes((uint8_t*)data, 120);
-      // Second chunk: 120 bytes (10 samples)
-      accelgyro.getFIFOBytes((uint8_t*)data + 120, 120);
+      char imuData[168];  // 14 samples of raw IMU data
+      char outputData[224];  // 14 samples with timestamps (14 * 16)
       
-      file.write(data, 240);
+      // Read IMU data in two chunks
+      accelgyro.getFIFOBytes((uint8_t*)imuData, 84);  // 7 samples
+      accelgyro.getFIFOBytes((uint8_t*)imuData + 84, 84);  // 7 more samples
+      
+      // Interpolate timestamps for each sample
+      // Sample rate = 1000 Hz (1 ms per sample) from setRate(7) with DLPF=0
+      unsigned long currentTime = millis()-start;
+      for (int i = 0; i < 14; i++) {
+        // Interpolate: oldest sample first, newest sample last
+        // Sample 0 was captured 13 ms ago, sample 13 was just captured
+        unsigned long timestamp = currentTime - (13 - i);
+        
+        // Write timestamp (4 bytes, big-endian)
+        outputData[i * 16 + 0] = (timestamp >> 24) & 0xFF;
+        outputData[i * 16 + 1] = (timestamp >> 16) & 0xFF;
+        outputData[i * 16 + 2] = (timestamp >> 8) & 0xFF;
+        outputData[i * 16 + 3] = timestamp & 0xFF;
+        // Copy IMU data (12 bytes)
+        memcpy(&outputData[i * 16 + 4], &imuData[i * 12], 12);
+      }
+      
+      file.write(outputData, 224);
       mySerial.println(accelgyro.getFIFOCount());
       
       // Only sync every 10 writes to reduce SD overhead

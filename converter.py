@@ -13,26 +13,36 @@ if not bin_files:
 # Extract numbers from filenames and find the highest
 bin_files.sort(key=lambda x: int(os.path.basename(x).split('.')[0]))
 input_file = bin_files[-1]
-output_file = "output.txt"
+output_file = "output.csv"
 
 print(f"Converting {input_file}...")
 
 with open(input_file, "rb") as f_in, open(output_file, "w") as f_out:
     # Write CSV header
-    f_out.write("sample,ax,ay,az,gx,gy,gz\n")
+    f_out.write("sample,timestamp_ms,ax,ay,az,gx,gy,gz\n")
     
     sample_num = 0
     while True:
-        # Read 12 bytes (one sample: ax, ay, az, gx, gy, gz)
-        bytes_read = f_in.read(12)
-        if len(bytes_read) < 12:
+        # Read 16 bytes (one sample: 4 timestamp + 6 accel + 6 gyro)
+        bytes_read = f_in.read(16)
+        if len(bytes_read) < 16:
             break
         
-        # '>hhhhhh' = big-endian signed int16 (6 values)
-        ax, ay, az, gx, gy, gz = struct.unpack(">hhhhhh", bytes_read)
+        # Debug: print first sample raw bytes
+        if sample_num == 0:
+            print(f"First sample raw bytes: {bytes_read.hex()}")
+        
+        # '>I' = big-endian unsigned int32 (timestamp)
+        # '>hhhhhh' = big-endian signed int16 (6 values for IMU)
+        timestamp = struct.unpack(">I", bytes_read[0:4])[0]
+        ax, ay, az, gx, gy, gz = struct.unpack(">hhhhhh", bytes_read[4:16])
+        
+        # Debug: print first few samples
+        if sample_num < 5:
+            print(f"Sample {sample_num}: ts={timestamp}, ax={ax}, ay={ay}, az={az}, gx={gx}, gy={gy}, gz={gz}")
         
         # Write to CSV
-        f_out.write(f"{sample_num},{ax},{ay},{az},{gx},{gy},{gz}\n")
+        f_out.write(f"{sample_num},{timestamp},{ax},{ay},{az},{gx},{gy},{gz}\n")
         sample_num += 1
 
 print(f"Converted {sample_num} samples to {output_file}")
