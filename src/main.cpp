@@ -3,7 +3,7 @@
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
 #define LOG_INTERVAL_USEC 600
 #define MAX_FILE_SIZE 10000000UL
-
+#define BUFFER_SIZE 126
 
 // I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
 // for both classes must be in the include path of your project
@@ -172,7 +172,7 @@ void setup() {
     // Sample Rate = Base Rate / (1 + SMPLRT_DIV)
     // With DLPF=0: 8kHz / (1 + rate)
     // rate=0 -> 8000Hz, rate=1 -> 4000Hz, rate=3 -> 2000Hz, rate=7 -> 1000Hz
-    accelgyro.setRate(3);  // 8kHz (but accel limited to 1kHz max)
+    accelgyro.setRate(7);  // 8kHz (but accel limited to 1kHz max)
     
     accelgyro.setFIFOEnabled(1);
     accelgyro.setAccelFIFOEnabled(1);
@@ -271,16 +271,16 @@ void loop() {
     }
     
     // Only read when we have complete samples (multiples of 6 bytes)
-    // Read in batches of 198 bytes (33 samples) for efficiency
-    if (fifoCount >= 198 && millis() - start < 10000) {
-      mySerial.println(fifoCount);
+    // Read in batches of BUFFER_SIZE bytes (33 samples) for efficiency
+    if (fifoCount >= BUFFER_SIZE && millis() - start < 10000) {
+      mySerial.println(accelgyro.getFIFOCount());
       
       // Calculate how many complete samples we can read
-
-      char data[198];
-      accelgyro.getFIFOBytes((uint8_t*)data, 198);
-      file.write(data, 198);
       
+      char data[BUFFER_SIZE];
+      accelgyro.getFIFOBytes((uint8_t*)data, BUFFER_SIZE);
+      file.write(data, BUFFER_SIZE);
+      mySerial.println(accelgyro.getFIFOCount());
       // Only sync every 10 writes to reduce SD overhead
       syncCounter++;
       if (syncCounter >= 10) {
