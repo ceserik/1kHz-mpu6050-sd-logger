@@ -1,7 +1,21 @@
 import struct
+import os
+import glob
 
-input_file = "45.bin"
+# Find the highest numbered .bin file in the SD card directory
+sd_path = "/run/media/Riso/4331-0AE6/"
+bin_files = glob.glob(os.path.join(sd_path, "*.bin"))
+
+if not bin_files:
+    print("No .bin files found!")
+    exit(1)
+
+# Extract numbers from filenames and find the highest
+bin_files.sort(key=lambda x: int(os.path.basename(x).split('.')[0]))
+input_file = bin_files[-1]
 output_file = "output.txt"
+
+print(f"Converting {input_file}...")
 
 with open(input_file, "rb") as f_in, open(output_file, "w") as f_out:
     # Write CSV header
