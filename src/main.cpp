@@ -3,7 +3,7 @@
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
 #define LOG_INTERVAL_USEC 600
 #define MAX_FILE_SIZE 10000000UL
-#define BUFFER_SIZE 252  // 21 samples * 6 bytes - max reliable for I2C
+#define BUFFER_SIZE 120  // 10 samples * 12 bytes (accel+gyro) per chunk
 
 // I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
 // for both classes must be in the include path of your project
@@ -176,9 +176,9 @@ void setup() {
     
     accelgyro.setFIFOEnabled(1);
     accelgyro.setAccelFIFOEnabled(1);
-    accelgyro.setXGyroFIFOEnabled(0);
-    accelgyro.setYGyroFIFOEnabled(0);
-    accelgyro.setZGyroFIFOEnabled(0);
+    accelgyro.setXGyroFIFOEnabled(1);
+    accelgyro.setYGyroFIFOEnabled(1);
+    accelgyro.setZGyroFIFOEnabled(1);
     accelgyro.setTempFIFOEnabled(0);
     accelgyro.setSlave0FIFOEnabled(0);
     accelgyro.setSlave1FIFOEnabled(0);
@@ -270,17 +270,17 @@ void loop() {
       return;
     }
     
-    // Read in two 126-byte chunks (42 samples total)
-    if (fifoCount >= 252 && millis() - start < 10000) {
+    // Read in two 120-byte chunks (20 samples total with accel+gyro)
+    if (fifoCount >= 240 && millis() - start < 10000) {
       mySerial.println(accelgyro.getFIFOCount());
       
-      char data[252];
-      // First chunk: 126 bytes
-      accelgyro.getFIFOBytes((uint8_t*)data, 126);
-      // Second chunk: 126 bytes
-      accelgyro.getFIFOBytes((uint8_t*)data + 126, 126);
+      char data[240];
+      // First chunk: 120 bytes (10 samples)
+      accelgyro.getFIFOBytes((uint8_t*)data, 120);
+      // Second chunk: 120 bytes (10 samples)
+      accelgyro.getFIFOBytes((uint8_t*)data + 120, 120);
       
-      file.write(data, 252);
+      file.write(data, 240);
       mySerial.println(accelgyro.getFIFOCount());
       
       // Only sync every 10 writes to reduce SD overhead
