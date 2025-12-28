@@ -2,7 +2,7 @@
 #define SD_CS_PIN SS
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
 #define LOG_INTERVAL_USEC 600
-#define MAX_FILE_SIZE 10000000UL
+#define MAX_FILE_SIZE 100000000UL
 #define BUFFER_SIZE 112  // 7 samples * 16 bytes (4 timestamp + 12 IMU) per chunk
 
 // I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
@@ -163,6 +163,8 @@ void setup() {
     // initialize device
     mySerial.println("Initializing I2C devices...");
     accelgyro.initialize();
+    accelgyro.setFullScaleAccelRange(MPU6050_ACCEL_FS_16);
+    accelgyro.setFullScaleGyroRange(MPU6050_GYRO_FS_1000);
     
     // Set DLPF to 0 for 8kHz gyro rate (or keep at 1+ for 1kHz)
     // DLPF_CFG=0: 8kHz sample rate, 260Hz accel BW, 256Hz gyro BW
@@ -175,8 +177,8 @@ void setup() {
     accelgyro.setRate(7);  // 8kHz (but accel limited to 1kHz max)
     
     // Set ranges AFTER other configuration
-    accelgyro.setFullScaleAccelRange(0);  // ±2g
-    accelgyro.setFullScaleGyroRange(0);   // ±250°/s
+    //accelgyro.setFullScaleAccelRange(0);  // ±2g
+    //accelgyro.setFullScaleGyroRange(0);   // ±250°/s
     delay(10);  // Give sensor time to apply settings
     
     accelgyro.setFIFOEnabled(1);
@@ -282,7 +284,7 @@ void loop() {
     }
     
     // Read IMU data and add timestamps (16 bytes per sample: 4 timestamp + 12 IMU)
-    if (fifoCount >= 168 && millis() - start < 10000) {  // 14 samples * 12 bytes
+    if (fifoCount >= 168 && millis() ) {  // 14 samples * 12 bytes - start < 10000
       mySerial.println(accelgyro.getFIFOCount());
       
       char imuData[168];  // 14 samples of raw IMU data
