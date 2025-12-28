@@ -2,18 +2,24 @@ import struct
 import os
 import glob
 
-# Find the highest numbered .bin file in the SD card directory
-sd_path = "/run/media/Riso/4331-0AE6/"
-bin_files = glob.glob(os.path.join(sd_path, "*.bin"))
+automatic = 0
+input_file = "60.bin"
+##################################### YOU HAVE TO CHANGE PATH TO YOUR SD CARD################################
+if automatic == 1:
+    sd_path = "/run/media/Riso/4331-0AE6/"
+    bin_files = glob.glob(os.path.join(sd_path, "*.bin"))
 
-if not bin_files:
-    print("No .bin files found!")
-    exit(1)
+    if not bin_files:
+        print("No .bin files found!")
+        exit(1)
 
-# Extract numbers from filenames and find the highest
-bin_files.sort(key=lambda x: int(os.path.basename(x).split('.')[0]))
-input_file = bin_files[-1]
-output_file = "output.csv"
+    # Extract numbers from filenames and find the highest
+    bin_files.sort(key=lambda x: int(os.path.basename(x).split('.')[0]))
+    input_file = bin_files[-1]
+
+# Extract the number from the binary filename
+file_number = os.path.basename(input_file).split('.')[0]
+output_file = f"output{file_number}.csv"
 
 print(f"Converting {input_file}...")
 

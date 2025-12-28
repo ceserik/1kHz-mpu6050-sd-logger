@@ -2,18 +2,24 @@
 #define SD_CS_PIN SS
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
 #define LOG_INTERVAL_USEC 600
-#define MAX_FILE_SIZE 100000000UL
+#define MAX_FILE_SIZE 100000000UL // is about 104 minutes of logging
 #define BUFFER_SIZE 112  // 7 samples * 16 bytes (4 timestamp + 12 IMU) per chunk
 
-// I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
-// for both classes must be in the include path of your project
+
+//#define UTF8_SD
+#define DEBUG
+
 #include "Arduino.h"
 #include "I2Cdev.h"
-
 #include "MPU6050.h"
 //#include <SD.h>
 #include "SdFat.h"
 
+// Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
+// is used in I2Cdev.h
+#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+    #include "Wire.h"
+#endif
 
 class DummySerial : public Stream
 {
@@ -34,28 +40,6 @@ public:
 	virtual size_t write(const uint8_t*, size_t){return 0;};
 	using Print::write; // pull in write(str) and write(buf, size) from Print
 	operator bool();
-
-
-	// This method allows processing "SEND_BREAK" requests sent by
-	// the USB host. Those requests indicate that the host wants to
-	// send a BREAK signal and are accompanied by a single uint16_t
-	// value, specifying the duration of the break. The value 0
-	// means to end any current break, while the value 0xffff means
-	// to start an indefinite break.
-	// readBreak() will return the value of the most recent break
-	// request, but will return it at most once, returning -1 when
-	// readBreak() is called again (until another break request is
-	// received, which is again returned once).
-	// This also mean that if two break requests are received
-	// without readBreak() being called in between, the value of the
-	// first request is lost.
-	// Note that the value returned is a long, so it can return
-	// 0-0xffff as well as -1.
-	int32_t readBreak();
-
-	// These return the settings specified by the USB host for the
-	// serial port. These aren't really used, but are offered here
-	// in case a sketch wants to act on these settings.
 	uint32_t baud(){return 0;};
 	uint8_t stopbits(){return 0;};
 	uint8_t paritytype(){return 0;};
@@ -77,32 +61,6 @@ public:
 
 };
 
-// Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
-// is used in I2Cdev.h
-#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-    #include "Wire.h"
-#endif
-
-// class default I2C address is 0x68
-// specific I2C addresses may be passed as a parameter here
-MPU6050 accelgyro;
-int16_t ax, ay, az;
-int16_t gx, gy, gz;
-
-// uncomment "OUTPUT_READABLE_ACCELGYRO" if you want to see a tab-separated
-// list of the accel X/Y/Z and then gyro X/Y/Z values in decimal. Easy to read,
-// not so easy to parse, and slow(er) over UART.
-//#define OUTPUT_READABLE_ACCELGYRO
-
-// uncomment "OUTPUT_BINARY_ACCELGYRO" to send all 6 axes of data as 16-bit
-// binary, one right after the other. This is very fast (as fast as possible
-// without compression or data loss), and easy to parse, but impossible to read
-// for a human.
-//#define OUTPUT_BINARY_ACCELGYRO
-
-//#define UTF8_SD
-#define DEBUG
-
 DummySerial dummySerial;
 
 #ifdef DEBUG
@@ -111,6 +69,10 @@ DummySerial dummySerial;
 #define mySerial dummySerial
 #endif
 
+MPU6050 accelgyro;
+int16_t ax, ay, az;
+int16_t gx, gy, gz;
+
 const int chipSelect = 10;
 SdFs sd;
 FsFile file;
@@ -118,7 +80,6 @@ FsFile file;
 bool blinkState = false;
 
 uint8_t counter = 0;
-//uint8_t buffer[42*3*2];
 uint16_t fileNum = 0;
 uint16_t syncCounter = 0;
 unsigned long start;
@@ -128,7 +89,6 @@ void openNewFile() {
   }
 
   char filename[10];
-  
   // Find first non-existent file number
   while (fileNum < 100) {
     sprintf(filename, "%02d.bin", fileNum);
@@ -160,27 +120,15 @@ void setup() {
         Fastwire::setup(400, true);
     #endif
     mySerial.begin(115200);
-    // initialize device
+    // initialize MPU6050
     mySerial.println("Initializing I2C devices...");
     accelgyro.initialize();
     accelgyro.setFullScaleAccelRange(MPU6050_ACCEL_FS_16);
     accelgyro.setFullScaleGyroRange(MPU6050_GYRO_FS_1000);
-    
-    // Set DLPF to 0 for 8kHz gyro rate (or keep at 1+ for 1kHz)
-    // DLPF_CFG=0: 8kHz sample rate, 260Hz accel BW, 256Hz gyro BW
-    // DLPF_CFG=1: 1kHz sample rate, 184Hz accel BW, 188Hz gyro BW
     accelgyro.setDLPFMode(0);  // 8kHz base rate for gyro
-    
-    // Sample Rate = Base Rate / (1 + SMPLRT_DIV)
-    // With DLPF=0: 8kHz / (1 + rate)
     // rate=0 -> 8000Hz, rate=1 -> 4000Hz, rate=3 -> 2000Hz, rate=7 -> 1000Hz
     accelgyro.setRate(7);  // 8kHz (but accel limited to 1kHz max)
-    
-    // Set ranges AFTER other configuration
-    //accelgyro.setFullScaleAccelRange(0);  // ±2g
-    //accelgyro.setFullScaleGyroRange(0);   // ±250°/s
-    delay(10);  // Give sensor time to apply settings
-    
+    // setup MPU6050 FIFO
     accelgyro.setFIFOEnabled(1);
     accelgyro.setAccelFIFOEnabled(1);
     accelgyro.setXGyroFIFOEnabled(1);
@@ -192,11 +140,9 @@ void setup() {
     accelgyro.setSlave2FIFOEnabled(0);
     accelgyro.setSlave3FIFOEnabled(0);
     
-    //accelgyro.resetFIFO();  // Clear any garbage data
-
     // verify connection
-//    mySerial.println("Testing device connections...");
- //   mySerial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+    //mySerial.println("Testing device connections...");
+    //mySerial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
 
     // use the code below to change accel/gyro offset values
     
