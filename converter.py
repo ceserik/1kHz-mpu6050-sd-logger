@@ -2,9 +2,9 @@ import struct
 import os
 import glob
 
-automatic = 0
+automatic = 1
 input_file = "60.bin"
-##################################### YOU HAVE TO CHANGE PATH TO YOUR SD CARD################################
+##################################### YOU HAVE TO CHANGE PATH TO YOUR SD CARD IF YOU WANT TO USE AUTMOATIC################################
 if automatic == 1:
     sd_path = "/run/media/Riso/4331-0AE6/"
     bin_files = glob.glob(os.path.join(sd_path, "*.bin"))

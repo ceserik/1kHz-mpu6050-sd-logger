@@ -3,7 +3,7 @@
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
 #define LOG_INTERVAL_USEC 600
 #define MAX_FILE_SIZE 100000000UL // is about 104 minutes of logging
-#define BUFFER_SIZE 112  // 7 samples * 16 bytes (4 timestamp + 12 IMU) per chunk
+#define BUFFER_SIZE 168  // 7 samples * 16 bytes (4 timestamp + 12 IMU) per chunk
 
 
 //#define UTF8_SD
@@ -121,7 +121,7 @@ void setup() {
     #endif
     mySerial.begin(115200);
     // initialize MPU6050
-    mySerial.println(F("Initializing I2C devices..."));
+    //mySerial.println(F("Initializing I2C devices..."));
     accelgyro.initialize();
     accelgyro.setFullScaleAccelRange(MPU6050_ACCEL_FS_16);
     accelgyro.setFullScaleGyroRange(MPU6050_GYRO_FS_1000);
@@ -141,27 +141,29 @@ void setup() {
     accelgyro.setSlave3FIFOEnabled(0);
     
     // verify connection
-    //mySerial.println("Testing device connections...");
-    //mySerial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
+    //mySerial.println(F("Testing device connections..."));
+    //mySerial.println(accelgyro.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
 
     // use the code below to change accel/gyro offset values
     
-//    mySerial.println("Updating internal sensor offsets...");
+//    mySerial.println(F("Updating internal sensor offsets..."));
     // -76	-2359	1688	0	0	0
-    mySerial.print(accelgyro.getXAccelOffset()); mySerial.print(F("\t")); // -76
-    mySerial.print(accelgyro.getYAccelOffset()); mySerial.print(F("\t")); // -2359
-    mySerial.print(accelgyro.getZAccelOffset()); mySerial.print(F("\t")); // 1688
-    mySerial.print(accelgyro.getXGyroOffset()); mySerial.print(F("\t")); // 0
-    mySerial.print(accelgyro.getYGyroOffset()); mySerial.print(F("\t")); // 0
-    mySerial.print(accelgyro.getZGyroOffset()); mySerial.print(F("\t")); // 0
     mySerial.print(F("\n"));
     accelgyro.setXGyroOffset(97);
     accelgyro.setYGyroOffset(112);
     accelgyro.setZGyroOffset(-22);
 
-    accelgyro.setXAccelOffset(-773);  // Test with no offsets
-    accelgyro.setYAccelOffset(-1656);
-    accelgyro.setZAccelOffset(1580);
+    accelgyro.setXAccelOffset(-1911);  // Test with no offsets
+    accelgyro.setYAccelOffset(-553);
+    accelgyro.setZAccelOffset(1433);
+    mySerial.println("stay still calibrating");
+    delay(1000);
+    accelgyro.CalibrateAccel(10);
+    mySerial.println("calibrating gyro");
+    accelgyro.CalibrateGyro(6);
+    mySerial.println("calibation finished");
+    Serial.println("\nat 600 Readings");
+    //accelgyro.PrintActiveOffsets();
 
     mySerial.print(accelgyro.getXAccelOffset()); mySerial.print(F("\t")); // -76
     mySerial.print(accelgyro.getYAccelOffset()); mySerial.print(F("\t")); // -2359
@@ -230,10 +232,10 @@ void loop() {
     }
     
     // Read IMU data and add timestamps (16 bytes per sample: 4 timestamp + 12 IMU)
-    if (fifoCount >= 168 && millis() ) {  // 14 samples * 12 bytes - start < 10000
-      mySerial.println(accelgyro.getFIFOCount());
+    if (fifoCount >= BUFFER_SIZE && millis() ) {  // 14 samples * 12 bytes - start < 10000
+      //mySerial.println(accelgyro.getFIFOCount());
       
-      char imuData[168];  // 14 samples of raw IMU data
+      char imuData[BUFFER_SIZE];  // 14 samples of raw IMU data
       char outputData[224];  // 14 samples with timestamps (14 * 16)
       
       // Read IMU data in two chunks
@@ -258,11 +260,11 @@ void loop() {
       }
       
       file.write(outputData, 224);
-      mySerial.println(accelgyro.getFIFOCount());
+      //mySerial.println(accelgyro.getFIFOCount());
       
       // Only sync every 10 writes to reduce SD overhead
       syncCounter++;
-      if (syncCounter >= 10) {
+      if (syncCounter >= 20) {
         file.sync();
         syncCounter = 0;
       }
