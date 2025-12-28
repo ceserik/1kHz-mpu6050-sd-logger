@@ -121,7 +121,7 @@ void setup() {
     #endif
     mySerial.begin(115200);
     // initialize MPU6050
-    mySerial.println("Initializing I2C devices...");
+    mySerial.println(F("Initializing I2C devices..."));
     accelgyro.initialize();
     accelgyro.setFullScaleAccelRange(MPU6050_ACCEL_FS_16);
     accelgyro.setFullScaleGyroRange(MPU6050_GYRO_FS_1000);
@@ -148,13 +148,13 @@ void setup() {
     
 //    mySerial.println("Updating internal sensor offsets...");
     // -76	-2359	1688	0	0	0
-    mySerial.print(accelgyro.getXAccelOffset()); mySerial.print("\t"); // -76
-    mySerial.print(accelgyro.getYAccelOffset()); mySerial.print("\t"); // -2359
-    mySerial.print(accelgyro.getZAccelOffset()); mySerial.print("\t"); // 1688
-    mySerial.print(accelgyro.getXGyroOffset()); mySerial.print("\t"); // 0
-    mySerial.print(accelgyro.getYGyroOffset()); mySerial.print("\t"); // 0
-    mySerial.print(accelgyro.getZGyroOffset()); mySerial.print("\t"); // 0
-    mySerial.print("\n");
+    mySerial.print(accelgyro.getXAccelOffset()); mySerial.print(F("\t")); // -76
+    mySerial.print(accelgyro.getYAccelOffset()); mySerial.print(F("\t")); // -2359
+    mySerial.print(accelgyro.getZAccelOffset()); mySerial.print(F("\t")); // 1688
+    mySerial.print(accelgyro.getXGyroOffset()); mySerial.print(F("\t")); // 0
+    mySerial.print(accelgyro.getYGyroOffset()); mySerial.print(F("\t")); // 0
+    mySerial.print(accelgyro.getZGyroOffset()); mySerial.print(F("\t")); // 0
+    mySerial.print(F("\n"));
     accelgyro.setXGyroOffset(97);
     accelgyro.setYGyroOffset(112);
     accelgyro.setZGyroOffset(-22);
@@ -163,22 +163,22 @@ void setup() {
     accelgyro.setYAccelOffset(-1656);
     accelgyro.setZAccelOffset(1580);
 
-    mySerial.print(accelgyro.getXAccelOffset()); mySerial.print("\t"); // -76
-    mySerial.print(accelgyro.getYAccelOffset()); mySerial.print("\t"); // -2359
-    mySerial.print(accelgyro.getZAccelOffset()); mySerial.print("\t"); // 1688
-    mySerial.print(accelgyro.getXGyroOffset()); mySerial.print("\t"); // 0
-    mySerial.print(accelgyro.getYGyroOffset()); mySerial.print("\t"); // 0
-    mySerial.print(accelgyro.getZGyroOffset()); mySerial.print("\t"); // 0
-    mySerial.print("\n");
+    mySerial.print(accelgyro.getXAccelOffset()); mySerial.print(F("\t")); // -76
+    mySerial.print(accelgyro.getYAccelOffset()); mySerial.print(F("\t")); // -2359
+    mySerial.print(accelgyro.getZAccelOffset()); mySerial.print(F("\t")); // 1688
+    mySerial.print(accelgyro.getXGyroOffset()); mySerial.print(F("\t")); // 0
+    mySerial.print(accelgyro.getYGyroOffset()); mySerial.print(F("\t")); // 0
+    mySerial.print(accelgyro.getZGyroOffset()); mySerial.print(F("\t")); // 0
+    mySerial.print(F("\n"));
     
     // Debug: Check actual range settings
-    mySerial.print("Accel range: ");
+    mySerial.print(F("Accel range: "));
     mySerial.println(accelgyro.getFullScaleAccelRange());  // Should be 0 for ±2g
-    mySerial.print("Gyro range: ");
+    mySerial.print(F("Gyro range: "));
     mySerial.println(accelgyro.getFullScaleGyroRange());  // Should be 0 for ±250°/s
 
     //while(1){}
-    mySerial.println("Initializing SD card...");
+    mySerial.println(F("Initializing SD card..."));
     
     // Close any open files and end previous SD session
     if (file.isOpen()) {
@@ -198,24 +198,24 @@ void setup() {
         sdInitialized = true;
         break;
       }
- //     mySerial.print("SD init attempt ");
+ //     mySerial.print(F("SD init attempt "));
       mySerial.print(attempt + 1);
-      mySerial.println(" failed, retrying...");
+      mySerial.println(F(" failed, retrying..."));
       sd.end();
       delay(100);
     }
     
     if (!sdInitialized) {
-      mySerial.println("FF");
+      mySerial.println(F("FF"));
       while (true);
     }
   
     openNewFile();
     
- //   Serial.println("initialization done.");
+ //   Serial.println(F("initialization done."));
     pinMode(LED_PIN, OUTPUT);
     accelgyro.resetFIFO();
-    mySerial.println("logging");
+    mySerial.println(F("logging"));
     start = millis();
 }
 
@@ -224,7 +224,7 @@ void loop() {
     
     // Check for FIFO overflow (max is 1024 bytes)
     if (fifoCount >= 1024) {
-      mySerial.println("FIFO overflow - resetting");
+      mySerial.println(F("FIFO overflow - resetting"));
       accelgyro.resetFIFO();
       return;
     }
