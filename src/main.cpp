@@ -2,7 +2,7 @@
 #define SD_CS_PIN SS
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
 #define LOG_INTERVAL_USEC 600
-#define MAX_FILE_SIZE 100000000UL // is about 104 minutes of logging
+#define MAX_FILE_SIZE 10000000UL // is about 104 minutes of logging
 #define BUFFER_SIZE 168  // 7 samples * 16 bytes (4 timestamp + 12 IMU) per chunk
 
 
@@ -160,7 +160,7 @@ void setup() {
     delay(1000);
     accelgyro.CalibrateAccel(10);
     mySerial.println("calibrating gyro");
-    accelgyro.CalibrateGyro(6);
+    accelgyro.CalibrateGyro(10);
     mySerial.println("calibation finished");
     Serial.println("\nat 600 Readings");
     //accelgyro.PrintActiveOffsets();
@@ -204,7 +204,7 @@ void setup() {
       mySerial.print(attempt + 1);
       mySerial.println(F(" failed, retrying..."));
       sd.end();
-      delay(100);
+      delay(1000);
     }
     
     if (!sdInitialized) {
