@@ -7,6 +7,7 @@ I wrote this to log motion of hobby rocket launch. The code periodically reads F
 - 5V compatible SD adapter 
 - MPU6050 
 - 300mAh lipo (lasts for around 6 hours, which is overkill) 
+- lipo protection/charging module
 - 5V stepup 
 - 3d printed holder(Freecad + .stp files in repo)
 
