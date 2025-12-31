@@ -244,7 +244,7 @@ void loop() {
       char imuData[BUFFER_SIZE];  // 14 samples of raw IMU data
       char outputData[224];  // 14 samples with timestamps (14 * 16)
       
-      // Read IMU data in two chunks
+      // Read IMU data in two chunks, for some reason reading more than 128 bytes at once results in mangled data
       accelgyro.getFIFOBytes((uint8_t*)imuData, 84);  // 7 samples
       accelgyro.getFIFOBytes((uint8_t*)imuData + 84, 84);  // 7 more samples
       
