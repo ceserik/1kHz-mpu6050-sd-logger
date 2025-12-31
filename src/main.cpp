@@ -1,3 +1,16 @@
+// WIRING 
+// MPU6050
+// SCL - A5
+// SDA - A4
+//
+// SD READER
+// CS - 10
+// SCK -13
+// MOSI-11
+// MISO-12 
+
+
+
 #define SPI_CLOCK SD_SCK_MHZ(50)
 #define SD_CS_PIN SS
 #define SD_CONFIG SdSpiConfig(SD_CS_PIN, DEDICATED_SPI, SPI_CLOCK)
