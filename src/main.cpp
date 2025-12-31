@@ -192,15 +192,8 @@ void setup() {
     mySerial.print(F("Gyro range: "));
     mySerial.println(accelgyro.getFullScaleGyroRange());  // Should be 0 for ±250°/s
 
-    //while(1){}
     mySerial.println(F("Initializing SD card..."));
-    
-    // Close any open files and end previous SD session
-    if (file.isOpen()) {
-      file.close();
-    }
-    sd.end();
-    
+
     // Reset CS pin to ensure clean state
     pinMode(SD_CS_PIN, OUTPUT);
     digitalWrite(SD_CS_PIN, HIGH);
