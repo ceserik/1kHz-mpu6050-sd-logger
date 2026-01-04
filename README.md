@@ -1,5 +1,13 @@
 # 1khz logger for mpu6050 accelerometer + gyro, using arduino mini pro
+
+![Rocket Logger Device](PXL_20251231_080023316.jpg)
+
 I wrote this to log motion of hobby rocket launch. The code periodically reads FIFO buffer on MPU6050 and logs it to a SD card. Maximum sample rate of accelerometer is 1kHz, so I chose this as logging frequency. The data is stored as binary on sd card and you need to use converter.py to convert it to csv.
+
+## Images
+
+![Device View 1](PXL_20251231_075950422.jpg)
+![Device View 2](PXL_20251231_075955342.jpg)
 
 ## Parts list
 
