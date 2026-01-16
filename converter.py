@@ -6,7 +6,7 @@ automatic = 1
 input_file = "60.bin"
 ##################################### YOU HAVE TO CHANGE PATH TO YOUR SD CARD IF YOU WANT TO USE AUTMOATIC################################
 if automatic == 1:
-    sd_path = "/run/media/Riso/B585-A07D/"
+    sd_path = "/run/media/Riso/3823-18EC/"
     bin_files = glob.glob(os.path.join(sd_path, "*.bin"))
 
     if not bin_files:

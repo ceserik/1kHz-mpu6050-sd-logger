@@ -9,6 +9,10 @@ I wrote this to log motion of hobby rocket launch. The code periodically reads F
 ![Device View 1](PXL_20251231_075950422.jpg)
 ![Device View 2](PXL_20251231_075955342.jpg)
 
+## Data Analysis
+
+![Rocket Data Plot](rocket_data_plot.jpg)
+
 ## Parts list
 
 - 5V/16MHz Arduino mini pro 
