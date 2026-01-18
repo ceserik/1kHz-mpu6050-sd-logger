@@ -11,7 +11,7 @@ I wrote this to log motion of hobby rocket launch. The code periodically reads F
 
 ## Data Analysis
 
-![Rocket Data Plot](rocket_data_plot.jpg)
+![Rocket Data Plot](data/rocket_data_plot.jpg)
 
 ## Parts list
 
