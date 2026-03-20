@@ -1,8 +1,11 @@
 using CSV, DataFrames, GLMakie
 
 start = 233400;
-stop =  241480; #chute opened
-#stop =  290000; #touchdown
+stop =  241480; #chute opened 
+
+
+start = 40000
+stop =  50480
 
 
 #max 16 bit signed 32767
@@ -15,7 +18,7 @@ lsb2g = 1/2048;
 g2ms = 9.81;
 
 sampling_rate = 1000;
-data = CSV.read("rocket logger/data/raketa3.csv", DataFrame);
+data = CSV.read("rocket logger/data/motor_D9-7_start_1.csv", DataFrame);
 
 array_data = Matrix(data);
 
@@ -104,6 +107,6 @@ DataInspector(fig)
 ##lines!(axis_euler, time, yaw,     label = "yaw [deg]")
 #axislegend(axis_euler)
 
-save("rocket logger/data/rocket_data_plot.jpg", fig)
+save("rocket logger/data/rocket_data_plot2.jpg", fig)
 
 fig 

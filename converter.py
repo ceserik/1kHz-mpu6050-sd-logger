@@ -2,8 +2,8 @@ import struct
 import os
 import glob
 
-automatic = 1
-input_file = "60.bin"
+automatic = 0
+input_file = "06.bin"
 ##################################### YOU HAVE TO CHANGE PATH TO YOUR SD CARD IF YOU WANT TO USE AUTMOATIC################################
 if automatic == 1:
     sd_path = "/run/media/Riso/3823-18EC/"

@@ -13,6 +13,8 @@ I wrote this to log motion of hobby rocket launch. The code periodically reads F
 
 ![Rocket Data Plot](data/rocket_data_plot.jpg)
 
+![D9-7 Motor](data/D9-7.jpg)
+
 ## Parts list
 
 - 5V/16MHz Arduino mini pro 
